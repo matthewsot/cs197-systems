@@ -1,0 +1,4 @@
+/target
+samples/large_sample_excerpt.cnf
+samples/large_sample.cnf
+src/solve.rs
