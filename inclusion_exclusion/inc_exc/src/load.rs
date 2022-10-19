@@ -30,7 +30,7 @@ fn front_comments(input: &str) -> IResult<&str, Vec<(&str, &str)>> {
     ))(input)
 }
 
-// swallows any comments in the middle of and immediately following the block of variables defining the clause
+// swallows any comments in the middle of the block of variables defining the clause
 fn clause(input: &str) -> IResult<&str, Clause> {
     let (input, digits) = separated_list1(
         // separator is either a space or a newline with possible comments
@@ -70,5 +70,5 @@ pub fn parse_dimacs(file_contents: &str) -> IResult<&str, DNF> {
     let (input, _num_clauses) = terminated(digit1, newline)(input)?;
     let (input, _) = front_comments(input)?;
     // the clauses in the input are in cnf form. therefore, we negate every value while parsing to obtain the dnf
-    many1(clause)(input)
+    many1(terminated(clause, opt(front_comments)))(input)
 }
