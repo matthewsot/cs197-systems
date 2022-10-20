@@ -24,9 +24,7 @@ use std::{
     time::Instant,
 };
 
-use load::{Clause, DNF};
-
-use crate::load::parse_dimacs;
+use load::{parse_dimacs, Clause, DNF};
 
 mod load;
 
@@ -45,10 +43,8 @@ enum Merge {
 fn merge(a: Clause, b: &Clause) -> Merge {
     let mut output = a;
     for (&var, &value) in b {
-        if let Some(old_value) = output.insert(var, value) {
-            if old_value != value {
-                return Merge::Incompatible;
-            }
+        if output.insert(var, value) == Some(!value) {
+            return Merge::Incompatible;
         }
     }
     Merge::Set(output)
@@ -62,7 +58,7 @@ fn solve(dnf: &DNF, max_size: usize) -> (SolutionResult, usize, f64) {
     cache.insert(vec![], HashMap::new());
     // 0th generation. no combination of indices yet
     let mut queue: VecDeque<Vec<usize>> = VecDeque::from(vec![vec![]]);
-    // critical variable for testing for completion. 
+    // critical variable for testing for completion.
     let mut sum: f64 = 0.0;
     // total number of variables in all the clauses. (alternatively, parse from the dimacs input)
     let total_vars = dnf

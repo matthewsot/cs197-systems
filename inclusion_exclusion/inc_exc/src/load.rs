@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, ops::Not};
 
 use nom::{
     branch::alt,
@@ -20,6 +20,16 @@ pub type Clause = HashMap<u32, Sign>;
 pub enum Sign {
     Positive,
     Negative,
+}
+
+impl Not for Sign {
+    type Output = Sign;
+    fn not(self) -> Self::Output {
+        match self {
+            Self::Positive => Self::Negative,
+            Self::Negative => Self::Positive,
+        }
+    }
 }
 
 /// 0 or more comment lines
