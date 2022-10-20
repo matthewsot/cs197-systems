@@ -30,31 +30,6 @@ use crate::load::parse_dimacs;
 
 mod load;
 
-// reimplemented in solve
-// /// returns a vec of vecs of indices that correspond to subsets with the given size of a CNF with the given number of clauses
-// /// ```
-// /// assert_eq!(gen_subsets(3,2), 3);
-// /// assert_eq!(gen_subsets(9,4), 126);
-// /// ```
-// fn gen_subsets(clause_count: usize, size: usize) -> Vec<Vec<usize>> {
-//     let mut out: Vec<Vec<usize>> = Vec::new();
-//     let mut queue: VecDeque<Vec<usize>> = VecDeque::from(vec![vec![]]);
-//     while let Some(set) = queue.pop_front() {
-//         if set.len() == size {
-//             out.push(set);
-//         } else {
-//             // extend by another index
-//             // this new index must be greater than the last index in the set
-//             for new_index in (set.last().map(|&e| e + 1).unwrap_or(0))..(clause_count) {
-//                 let mut new_set = set.clone();
-//                 new_set.push(new_index);
-//                 queue.push_back(new_set);
-//             }
-//         }
-//     }
-//     out
-// }
-
 #[derive(Debug, PartialEq)]
 enum SolutionResult {
     Inconclusive,
@@ -80,24 +55,24 @@ fn merge(a: Clause, b: &Clause) -> Merge {
 }
 
 // max_size is the maximum allowed size for subset generation
-fn solve(dnf: &DNF, max_size: usize) -> (SolutionResult, usize, i64) {
+fn solve(dnf: &DNF, max_size: usize) -> (SolutionResult, usize, f64) {
     // a map from a set of clause indices to their merged set if it is valid
     let mut cache: HashMap<Vec<usize>, Clause> = HashMap::new();
     // 0th generation. the empty set of clauses has no literals in its merge
     cache.insert(vec![], HashMap::new());
     // 0th generation. no combination of indices yet
     let mut queue: VecDeque<Vec<usize>> = VecDeque::from(vec![vec![]]);
-    // critical variable for testing for completion
-    let mut sum = 0;
+    // critical variable for testing for completion. 
+    let mut sum: f64 = 0.0;
     // total number of variables in all the clauses. (alternatively, parse from the dimacs input)
     let total_vars = dnf
         .iter()
         .map(|h| h.iter())
         .flat_map(|i| i)
         .collect::<HashMap<_, _>>()
-        .len() as u32;
+        .len() as i32;
     // the queue can contain future and current generations (generations by size of subset)
-    // therefore, we use max_seen_size to determine when we have finished one generation 
+    // therefore, we use max_seen_size to determine when we have finished one generation
     // and will start processing the next generation
     let mut max_seen_size = 0;
     while let Some(set) = queue.pop_front() {
@@ -108,7 +83,7 @@ fn solve(dnf: &DNF, max_size: usize) -> (SolutionResult, usize, i64) {
         if set.len() != max_size {
             // extend by another index
             // this new index must be greater than the last index in the set
-            // because our set is an ordered list of increasing indices, this guarantees 
+            // because our set is an ordered list of increasing indices, this guarantees
             // every new set we create will be unique
             for new_index in (set.last().map(|&e| e + 1).unwrap_or(0))..(dnf.len()) {
                 // merge the cached set with the clause at the new_index
@@ -120,8 +95,12 @@ fn solve(dnf: &DNF, max_size: usize) -> (SolutionResult, usize, i64) {
                         // add this set of clauses in the queue to be explored further
                         queue.push_back(new_set.clone());
                         // add to sum the size of the solution space for this merged set
-                        sum += (if new_set.len() % 2 == 0 { -1 } else { 1 })
-                            * i64::pow(2, total_vars - clause.len() as u32);
+                        let current_term = f64::powi(2.0, total_vars - clause.len() as i32);
+                        if new_set.len() % 2 == 0 {
+                            sum -= current_term;
+                        } else {
+                            sum += current_term
+                        };
                         // and insert the result of the merge into the cache
                         cache.insert(new_set, clause);
                     }
@@ -144,9 +123,9 @@ fn solve(dnf: &DNF, max_size: usize) -> (SolutionResult, usize, i64) {
         // therefore, once we "level up", we may analyze the sum, as it now accounts for the entire previous level of sizes
         if set.len() > max_seen_size {
             // check the sum and see if it is (a lower bound and above 2^N) or (an upper bound and below 2^n)
-            if max_seen_size % 2 == 0 && sum >= i64::pow(2, total_vars) {
+            if max_seen_size % 2 == 0 && sum >= f64::powi(2.0, total_vars) {
                 return (SolutionResult::Unsatisfiable, max_seen_size, sum);
-            } else if max_seen_size % 2 == 1 && sum < i64::pow(2, total_vars) {
+            } else if max_seen_size % 2 == 1 && sum < f64::powi(2.0, total_vars) {
                 return (SolutionResult::Satisfiable, max_seen_size, sum);
             }
             max_seen_size = set.len();
@@ -154,7 +133,7 @@ fn solve(dnf: &DNF, max_size: usize) -> (SolutionResult, usize, i64) {
     }
     // the last "level up" is not caught inside the loop
     // therefore, we add this final check after we've reached the maximum size of subsets and exited the loop
-    if sum >= i64::pow(2, total_vars) {
+    if sum >= f64::powi(2.0, total_vars) {
         (SolutionResult::Unsatisfiable, max_seen_size, sum)
     } else {
         (SolutionResult::Satisfiable, max_seen_size, sum)
@@ -181,4 +160,12 @@ fn main() {
     };
     check("samples/sat", SolutionResult::Satisfiable);
     check("samples/unsat", SolutionResult::Unsatisfiable);
+
+    let dnf = parse_dimacs(&{
+        fs::read_to_string(std::path::PathBuf::from("samples/parsertest.txt")).unwrap()
+    })
+    .expect("invalid DIMACS in sample input")
+    .1;
+    let (result, _, _) = solve(&dnf, 5);
+    assert!(result == SolutionResult::Unsatisfiable);
 }
