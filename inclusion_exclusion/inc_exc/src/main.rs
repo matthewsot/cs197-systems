@@ -118,7 +118,7 @@ fn solve(dnf: &DNF, max_size: usize) -> (SolutionResult, usize, f64) {
         }
     }
     // the last "level up" is not caught inside the loop
-    // therefore, we add this final check after we've reached the maximum size of subsets and exited the loop
+    // therefore, we add this final check after we've exhausted all search paths in the queue and exited the loop
     if sum >= f64::powi(2.0, total_vars) {
         (SolutionResult::Unsatisfiable, max_seen_size, sum)
     } else {
