@@ -52,12 +52,8 @@ fn merge(a: Clause, b: &Clause) -> Merge {
 
 // max_size is the maximum allowed size for subset generation
 fn solve(dnf: &DNF, max_size: usize) -> (SolutionResult, usize, f64) {
-    // a map from a set of clause indices to their merged set if it is valid
-    let mut cache: HashMap<Vec<usize>, Clause> = HashMap::new();
-    // 0th generation. the empty set of clauses has no literals in its merge
-    cache.insert(vec![], HashMap::new());
     // 0th generation. no combination of indices yet
-    let mut queue: VecDeque<Vec<usize>> = VecDeque::from(vec![vec![]]);
+    let mut queue: VecDeque<(Vec<usize>, Clause)> = VecDeque::from(vec![(vec![], HashMap::new())]);
     // critical variable for testing for completion.
     let mut sum: f64 = 0.0;
     // total number of variables in all the clauses. (alternatively, parse from the dimacs input)
@@ -71,11 +67,7 @@ fn solve(dnf: &DNF, max_size: usize) -> (SolutionResult, usize, f64) {
     // therefore, we use max_seen_size to determine when we have finished one generation
     // and will start processing the next generation
     let mut max_seen_size = 0;
-    while let Some(set) = queue.pop_front() {
-        // remove from cache the merged set for this clause set.
-        let cache_entry = cache
-            .remove(&set)
-            .expect("Must always have a previous cache entry");
+    while let Some((set, merge_result)) = queue.pop_front() {
         if set.len() != max_size {
             // extend by another index
             // this new index must be greater than the last index in the set
@@ -83,13 +75,11 @@ fn solve(dnf: &DNF, max_size: usize) -> (SolutionResult, usize, f64) {
             // every new set we create will be unique
             for new_index in (set.last().map(|&e| e + 1).unwrap_or(0))..(dnf.len()) {
                 // merge the cached set with the clause at the new_index
-                match merge(cache_entry.clone(), &dnf[new_index]) {
+                match merge(merge_result.clone(), &dnf[new_index]) {
                     // if the merge succeeds,
                     Merge::Set(clause) => {
                         let mut new_set = set.clone();
                         new_set.push(new_index);
-                        // add this set of clauses in the queue to be explored further
-                        queue.push_back(new_set.clone());
                         // add to sum the size of the solution space for this merged set
                         let current_term = f64::powi(2.0, total_vars - clause.len() as i32);
                         if new_set.len() % 2 == 0 {
@@ -97,13 +87,13 @@ fn solve(dnf: &DNF, max_size: usize) -> (SolutionResult, usize, f64) {
                         } else {
                             sum += current_term
                         };
-                        // and insert the result of the merge into the cache
-                        cache.insert(new_set, clause);
+                        // add this set of clauses and the merge result in the queue to be explored further
+                        queue.push_back((new_set.clone(), clause));
                     }
                     // if incompatible, we do not wish to further explore this and thus do not insert into queue
-                    // HOWEVER, it may be wise to modify cache structure to allow storing INVALID results
+                    // HOWEVER, it may be wise to create a cache structure to allow storing INVALID results
                     // for example, we may explore 1,3 before 1,2,3. if 1,3 is invalid, we may store that it is invalid and look up later
-                    // however, 1,3 is not a direct ancestor of 1,2,3. thus, this search would necessitate linear probing of
+                    // 1,3 is not an obvious direct ancestor of 1,2,3. thus, this search would necessitate linear probing of
                     // every possible indirect ancestor in the previous generation: 2,3; 1,3; 1,2
                     // thus, we do not implement it here
                     Merge::Incompatible => {}
@@ -156,12 +146,4 @@ fn main() {
     };
     check("samples/sat", SolutionResult::Satisfiable);
     check("samples/unsat", SolutionResult::Unsatisfiable);
-
-    let dnf = parse_dimacs(&{
-        fs::read_to_string(std::path::PathBuf::from("samples/parsertest.txt")).unwrap()
-    })
-    .expect("invalid DIMACS in sample input")
-    .1;
-    let (result, _, _) = solve(&dnf, 5);
-    assert!(result == SolutionResult::Unsatisfiable);
 }
