@@ -59,8 +59,94 @@ int gen_num_sol(GenChild **prev_generation, unsigned long *array_size, unsigned 
     }
     // we need to free the previous generation, obviously also the merged clauses 
     // within it
+
+    for (size_t i = 0; i < prev_gen_size; i++) {
+        free(prev_gen[i].merged_clause);
+    }
+    free(prev_gen);
     // and then this new_gen becomes the prev_gen
     *prev_generation = new_gen;
+}
+
+/* This function populates the first generation in generations (an array of GenChilds)
+ *
+ * The first generation will consist of the following:
+ * 
+ * - numClauses # of GenChilds
+ * 
+ * - ith GenChild will consist of the following:
+ *      - last literal of ith clause
+ *      - num of solutions of ith clause
+ *      - ith clause
+ */ 
+
+unsigned long populate_first_gen(GenChild **generations, Clause *clauses, unsigned long total_literals, unsigned long total_clauses) {
+    unsigned long first_gen_soln = 0;
+
+    for (size_t i = 0; i < total_clauses; i++) {
+        unsigned long num_soln = count_solutions(clauses[i], total_literals);
+        // summing solutions to all clauses
+        first_gen_soln += num_soln;
+        // Since clauses are sorted, we get last literal of clause
+        unsigned long last_clause_num = (clauses[i].literals)[clauses[i].numLiterals];
+        // dynamically allocate memory for merged clause
+        (*generations)[i].merged_clause = malloc(sizeof(clauses[i]));
+        (*generations)[i] = {last_clause_num, num_soln, clauses[i]};
+
+    }
+
+    return first_gen_soln;
+}
+/* This function creates an array of GenChilds, called generations. The first generation
+ * is populated with the clauses themselves. Then, it receives the overestimated and
+ * underestimated count of solutions from other functions. This estimation determines
+ * whether the problem is sat or unsat.
+ *
+ */
+
+char *sat_solver(Clause *clauses, unsigned long total_literals, unsigned long total_clauses) {
+
+    unsigned long total_possible_soln = count_solutions();
+    unsigned long first_gen_soln = 0;
+
+    // first generation will have (# of clauses) GenChilds
+    unsigned long gen_array_size = total_clauses;
+    GenChild *generations = malloc(gen_array_size * sizeof(GenChild));
+    unsigned long first_gen_soln = populate_first_gen(&generations, clauses, total_literals, total_clauses);
+
+    if (first_gen_soln < total_possible_soln) {
+
+        return "sat";
+    }
+
+    unsigned long num_cur_soln = first_gen_soln;
+    
+    for (size_t i = 2; i < numClauses + 1; i++) {
+        // at the odd step
+        if (i % 2 == 1) {
+            unsigned long num_soln_k_pairs = gen_num_soln(&generations[i], &gen_array_size, total_clauses, i, clauses);
+            num_cur_soln += num_soln_k_pairs;
+            
+            // here we over estimated so if it is less than the CNF is SAT
+            if (num_cur_soln < total_possible_soln) {
+                return "sat";
+            }
+        // at the even step
+        } else {
+            unsigned long num_soln_k_pairs = gen_num_soln(&generations[i], &gen_array_size, total_clauses, i, clauses);
+            num_cur_soln -= num_soln_k_pairs;
+
+            // here we underestimated so if it is equal to total_possible, then it is unsat
+            if (num_cur_soln == total_possible_soln) {
+                return "unsat";
+            }
+
+        }
+
+    }
+
+
+
 }
 
 
