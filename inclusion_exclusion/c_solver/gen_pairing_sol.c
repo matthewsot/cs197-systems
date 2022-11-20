@@ -1,5 +1,7 @@
 #include "satsolver.h"
 
+int GEN_SIZE_START = 8;
+
 unsigned long gen_size(unsigned long k, unsigned long total_clauses){
     // basically we need to return total_clauses choose 
     // but just return a large constat for now
@@ -8,11 +10,12 @@ unsigned long gen_size(unsigned long k, unsigned long total_clauses){
 
 unsigned long count_solutions(Clause *clause, unsigned long total_literals){
     unsigned long numLiterals = clause->numLiterals;
-    printf("counting solutionsss\n");
-    printf("numLiterals is %ld \n", numLiterals);
+    //printf("counting solutionsss\n");
+    //printf("numLiterals is %ld \n", numLiterals);
     // when we do big num then different way obviously
-    unsigned long num_sol = pow(2, (total_literals - numLiterals));
-    printf("so num sol is %ld \n", num_sol);
+    unsigned long x = total_literals - numLiterals;
+    unsigned long num_sol = 1 << x;
+    //printf("so num sol is %ld \n", num_sol);
     return num_sol;
 }
 
@@ -39,11 +42,11 @@ unsigned long gen_num_sol(GenChild **prev_generation, unsigned long *array_size,
 {
     // so we know that when k is 2, we have the results of the 1st generation ready and we
     // want to calculate the results of the next generation
-    printf("generating num sol for generation number: %d \n", gen_num);
+    //printf("generating num sol for generation number: %d \n", gen_num);
     unsigned long prev_gen_size = *array_size;
     GenChild *prev_gen = *prev_generation;
-    unsigned long new_gen_size = gen_size(k, total_clauses); // this is the max size possible
-    GenChild *new_gen = malloc(new_gen_size * sizeof(GenChild));
+    unsigned long new_gen_size = GEN_SIZE_START; // this is the max size possible
+    GenChild *new_gen = (GenChild *)malloc(new_gen_size * sizeof(GenChild));
     unsigned long cur_index = 0;
     unsigned long total_solution = 0;
     for(unsigned long i = 0; i < prev_gen_size; ++i){
@@ -55,16 +58,22 @@ unsigned long gen_num_sol(GenChild **prev_generation, unsigned long *array_size,
             int cur_clause_num = j;
             // we need to merge cur_child_clause with this clause
             // clause array should be such that clause 0 is at index 0
-            printf("now merging clause number %d with merged clause where last clause is %ld \n",
-                    cur_clause_num, last_clause);
+            //printf("now merging clause number %d with merged clause where last clause is %ld \n",
+                  //  cur_clause_num, last_clause);
             Clause *result = merge(&clauses[cur_clause_num], cur_child.merged_clause);
             if (result == NULL){
-                printf("numsol is zero so NOT making the entry in generation \n"); 
+                //printf("numsol is zero so NOT making the entry in generation \n"); 
                 continue;
             }
             unsigned long num_sol = count_solutions(result, total_literals);
-            printf("numsol is nonzero so making the entry in generation \n");
-            // add the merged clause to the new generation
+            //printf("numsol is nonzero so making the entry in generation \n");
+            // add the merged clause to the new generation, and enlarge array if needed
+            if (cur_index == new_gen_size){
+                //printf("enlarging the array");
+                new_gen_size = new_gen_size * 2;
+                new_gen = (GenChild *)realloc(new_gen, new_gen_size * sizeof(GenChild));
+                assert(new_gen != NULL);
+            }
             new_gen[cur_index] = (GenChild){cur_clause_num, num_sol, result};
             cur_index++; // this will tell the true number of childs 
             total_solution += num_sol;
@@ -112,3 +121,13 @@ unsigned long populate_first_gen(GenChild **generations, Clause *clauses, unsign
     return first_gen_soln;
 }
 
+void print_generation(GenChild *generation, int gen_size, int gen_number){
+    printf("printing generation number %d , the size is: %d \n", gen_number, gen_size);
+    for(int i = 0; i < gen_size; i++){
+        GenChild cur_child = generation[i];
+        printf("child number: %d , last_clause_num: %ld , num_sol: %ld \n", 
+        i, cur_child.last_clause_num, cur_child.num_sol);
+        printf("Now printing the merged clause: \n");
+        printClause(cur_child.merged_clause);
+    }
+}

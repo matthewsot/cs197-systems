@@ -2,6 +2,11 @@
 
 #define  DEFAULT_CLAUSE_SIZE 8
 
+int compareLiterals(const void* literalA, const void* literalB) {
+    Literal *A = (Literal*) literalA;
+    Literal *B = (Literal*) literalB;
+    return A->value - B->value;
+}
 
 DimacsInfo parseDimacs(void) {
     /*
@@ -38,9 +43,10 @@ DimacsInfo parseDimacs(void) {
             }
             clause.literals = realloc(clause.literals, sizeof(Literal) * trueSize);
             clause.numLiterals = trueSize;
+            qsort(clause.literals, clause.numLiterals, sizeof(Literal), compareLiterals);
             clauses[i] = clause;
         }
-    DimacsInfo parseData = {clauses, numClauses, numLiterals};
+    DimacsInfo parseData = {clauses, numLiterals, numClauses};
     return parseData;
 }
 
@@ -56,9 +62,10 @@ void printClause(Clause *clause) {
 }
 
 //int main(void) {
-  //  DimacsInfo data = parseDimacs();
+  //DimacsInfo data = parseDimacs();
     //for (size_t i = 0; i < data.numClauses; i++) {
-      //  printClause(data.clauses + i);
+      // printf("Clause #%lu ", i + 1);
+       //printClause(data.clauses + i);
     //}
     //return 0;
 //}

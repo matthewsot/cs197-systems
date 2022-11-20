@@ -19,9 +19,9 @@ typedef struct Clause {
 } Clause;
 
 typedef struct DimacsInfo {
-	Clause* clauses;
-	unsigned long numLiterals;
-	unsigned long numClauses;
+    Clause* clauses;
+    unsigned long numLiterals;
+    unsigned long numClauses;
 } DimacsInfo; 
 
 typedef struct GenChild {
@@ -48,6 +48,7 @@ unsigned long gen_num_sol(GenChild **prev_generation, unsigned long *array_size,
                 unsigned long total_literals, unsigned long k, Clause* clauses, int gen_num);
 unsigned long populate_first_gen(GenChild **generations, Clause *clauses, unsigned long total_literals, 
                                  unsigned long total_clauses);
+void print_generation(GenChild *generation, int gen_size, int gen_number);
 
 
 
