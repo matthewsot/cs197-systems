@@ -2,12 +2,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-
-typedef struct Bignum {
-    uint64_t *words; // = NULL;
-    uint64_t n_words; //= 0 
-    int sign;
-} Bignum;
+#include "satsolver.h"
 
 Bignum createBignum() {
     Bignum num = {NULL, 0, 0};
@@ -23,6 +18,14 @@ int print_binary(Bignum *num) {
                 saw_first_one = 1;
             }
         }
+    }
+    if (!saw_first_one) printf("0");
+    printf("\n");
+}
+
+int print_hex(Bignum *num) {
+    for (int i = num->n_words; i --> 0;) {
+        printf("%lX", num->words[i]);
     }
     printf("\n");
 }
@@ -77,6 +80,7 @@ int pos_big_sub_small_pow_2(unsigned power, Bignum *num) {
      if (num->words[word_idx] < bit) {
         for (uint64_t i = word_idx + 1; i < num->n_words && num->words[i] > 0; i++) {
             num->words[i] -= 1;
+            break;
         }
         num->words[word_idx] = (-1) << power;
      } else {
@@ -95,58 +99,101 @@ int pos_big_sub_big_pow_2(unsigned power, Bignum *num) {
 
 int flip_sign(Bignum *num) {
     int original_sign = num->sign;
-    //printf("N words = %lu\n", num->n_words);
     if (original_sign) { // convert negative to positive
+        //printf("Converting negative to positive\n Before doing anything:\n");
+        //print_binary(num);
         num->sign = 0;
-        pos_big_sub_small_pow_2(0, num);
+        //printf("changed sign to pos, now going to subtract 1. result: \n");
+        pos_big_sub_small_pow_2(0, num); // 
+        //print_binary(num);
+        //printf("Negating.  Result: \n");
     }
     for (uint64_t i = 0; i < num->n_words; i++) {
         num->words[i] = ~(num->words[i]);
         //printf("Printing after flipping each word. This is flip %lu\n", i);
-        //print_binary(num);
+      
     }
+      //if (original_sign) print_binary(num);
     if (!original_sign) { // positive to negative
+        // OPTIMIZE: avoid setting num->sign to 1 twice
         num->sign = 1;
         add_pow_2(0, num);
         num->sign = 1; // in case overflow occurred
     }
 };
 
+int negative_big_sub_pow_2(unsigned power, Bignum *num) {
+    // (N - p) = -(p - N) = -(-N + p)
+    // flip num
+    // add p 
+    // flip result
+    flip_sign(num);
+    add_pow_2(power, num);
+    flip_sign(num);
+}
+
+
 int pow_2_sub_bignum(unsigned power, Bignum *num) {
     // subtracts the bignum from a power of 2
     flip_sign(num);
     add_pow_2(power, num);
 }
-
-void test_flips(Bignum *num, Bignum* ref) {
-    add_pow_2(1, ref); // 1
-    print_binary(ref);
-    flip_sign(ref); // -1
-    print_binary(ref);
-    flip_sign(ref); // 1
-    print_binary(ref);
-    flip_sign(ref); // -1
-    print_binary(ref);
-    flip_sign(ref); // 1
-    print_binary(ref);
-}
-//for testing
-int main() {
-    Bignum num = createBignum();
+/*
+void test_flips() {
     Bignum ref = createBignum();
-    test_flips(&num, &ref);
+    add_pow_2(65, &ref); // 1
+    print_binary(&ref);
+    flip_sign(&ref); // -1
+    print_binary(&ref);
+    flip_sign(&ref); // 1
+    print_binary(&ref);
+}
+
+void test_arithmetic() {
+    for (int i = 1; i < 128; i++) {
+     Bignum num = createBignum();
+     Bignum ref = createBignum();
+     add_pow_2(i, &num);
+     add_pow_2(i, &num);
+     add_pow_2(i, &num);
+     pos_big_sub_small_pow_2(i-1, &num);
+     add_pow_2(i + 1, &ref);
+     add_pow_2(i - 1, &ref);
+     printf("Expected \n");
+     print_binary(&ref);
+     printf("Calculated \n");
+     print_binary(&num);
+    }     
+}
+
+void test_twos_comp() {
+    for (int i = 0; i < 127; i++) {
+        Bignum num = createBignum();
+        add_pow_2(i, &num);
+        flip_sign(&num);
+        add_pow_2(1, &num);
+        add_pow_2(i, &num);
+        print_binary(&num);
+    }
+}
+
+int main() {
+    //test_flips();
+    //test_arithmetic();
+    //test_twos_comp();
     return 0;
 }
-
+*/
 /*
 What I think works:
 
-    -adding (two's compliment)
-    -switching from positive to negative 
-    -switching from negative to positive
-    -subtracting a smaller power from a positive bignum
-    -subtracting a bignum from a power (flip bignum then add)
-    -subtracting a power from a negative bignum (subtract bignum from power, then flip result)
-    -subtracting a larger power from a positive bignum
+    -adding (two's compliment) WORKS
+    -switching from positive to negative  WORKS 
+    -switching from negative to positive  WORKS
+
+    -subtracting a smaller power from a positive bignum WORKS
+    -subtracting a bignum from a power (flip bignum then add) DEPENDS ON OTHERS
+    -subtracting a power from a negative bignum (subtract bignum from power, then flip result) DEPENDS ON OTHERS
+    -subtracting a larger power from a positive bignum TESTING
 
 */

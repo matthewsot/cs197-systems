@@ -1,5 +1,6 @@
 #include "satsolver.h"
 
+
 Clause *basicTest(){
     // creates and returns an array of clauses.
     unsigned long clauseVals1[] = {1, 2, 3, 4};
@@ -44,53 +45,51 @@ void sat_solver(DimacsInfo input){
     unsigned long total_literals = input.numLiterals;
 	unsigned long total_clauses = input.numClauses;
 	
-    unsigned long total_possible_soln = pow(2, total_literals); 
+    //unsigned long total_possible_soln_pow = total_literals; 
 
     // first generation will have (# of clauses) GenChilds
     unsigned long gen_array_size = total_clauses;
     GenChild *generation = malloc(gen_array_size * sizeof(GenChild));
-    unsigned long first_gen_soln = populate_first_gen(&generation, clauses_array, total_literals, total_clauses);
+    Bignum I_k = createBignum();
+    populate_first_gen(&generation, clauses_array, total_literals, total_clauses, &I_k);
     print_generation(generation, gen_array_size, 1);
-    
-    if (first_gen_soln < total_possible_soln) {
+    /*if (isLessThanPower(total_literals, &I_k)) {
         printf("sat\n");
         return;
     }
-    
-    unsigned long I_k = first_gen_soln;
+    */
+    //unsigned long I_k = first_gen_soln;
     int gen_num = 2;
     
     for (size_t k = 2; k <= total_clauses; ++k){
-        // at the odd step
-        if (k % 2 == 1) {
-            unsigned long num_soln_k_pairs = gen_num_sol(&generation, &gen_array_size, total_clauses, 
-                                                         total_literals, k, clauses_array, gen_num);
+         gen_num_sol(&generation, &gen_array_size, total_clauses, 
+                      total_literals, k, clauses_array, gen_num, &I_k);
             print_generation(generation, gen_array_size, gen_num);
-            I_k += num_soln_k_pairs;
-            
+        //int isLess = isLessThanPower(total_literals, &I_k);
+        // at the odd step
+        /*
+        if (k % 2 == 1) {
             // here we over estimated so if it is less than the CNF is SAT
-            if (I_k < total_possible_soln){
+            if (isLess){
                 printf("sat\n");
                 return;
             }
         // at the even step
         } else {
-            unsigned long num_soln_k_pairs = gen_num_sol(&generation, &gen_array_size, total_clauses, 
-                                                         total_literals, k, clauses_array, gen_num);
-            print_generation(generation, gen_array_size, gen_num);
-            I_k -= num_soln_k_pairs;
-
             // here we underestimated so if it is equal to total_possible, then it is unsat
-            if (I_k == total_possible_soln) {
+            if (!isLess) {
                 printf("unsat\n");
                 return;
             }
-
         }
+        */
         gen_num++;
     }
     // obviously we never come here, this was when I was testing gen by gen
-    printf("outside loop \n");
+    printf("Number of solutions:  ");
+    pow_2_sub_bignum(total_literals, &I_k);
+    print_binary(&I_k);
+    print_hex(&I_k);
     return;
 }
 
@@ -99,7 +98,7 @@ int main(void) {
     Clause *clauses_array = basicTest(); // will be freed at the very end only!!
     unsigned long numLiterals = 5;
 	unsigned long numClauses = 4;
-	DimacsInfo data = {clauses_array, numLiterals, numClauses};
+	DimacsInfo data = parseDimacs(); //{clauses_array, numLiterals, numClauses};
 	// print the Dimacs
 	printf("printing DimacsInfo: \n");
 	for (size_t i = 0; i < data.numClauses; i++) {
